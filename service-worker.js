@@ -1,12 +1,9 @@
 // service-worker.js
 // Offline cache for Boxing Timer PWA
 
-// Bump this when you change index.html/manifest or want to force an update
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v7'; // bump when you ship updates
 const CACHE_NAME = `boxing-timer-${CACHE_VERSION}`;
 
-// NOTE: If you host at https://<user>.github.io/Timer/
-// keep these paths relative as below.
 const ASSETS = [
   './',
   './index.html',
@@ -21,18 +18,15 @@ const ASSETS = [
   'https://unpkg.com/@babel/standalone/babel.min.js'
 ];
 
-// Install: warm the cache
+// Install: warm the cache + take control ASAP
 self.addEventListener('install', (event) => {
-  // Activate this SW immediately
-  self.skipWaiting();
+  self.skipWaiting(); // <-- auto-activate new SW
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Use addAll; if any single fetch fails it throws.
-      // If you often change CDN versions, you can wrap individually.
       try {
         await cache.addAll(ASSETS);
       } catch (err) {
-        // Fallback: try to cache what we can, don’t fail install completely
+        // Cache as much as possible if some requests fail (e.g., CDN hiccups)
         await Promise.allSettled(
           ASSETS.map(async (url) => {
             try {
@@ -40,7 +34,7 @@ self.addEventListener('install', (event) => {
               if (resp && (resp.ok || resp.type === 'opaque')) {
                 await cache.put(url, resp.clone());
               }
-            } catch (_) { /* ignore */ }
+            } catch (_) {}
           })
         );
       }
@@ -48,24 +42,23 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: cleanup old versions
+// Activate: clean old caches + claim clients immediately
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      );
-      await self.clients.claim();
-    })()
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
+    await self.clients.claim(); // <-- correct spelling, inside the waitUntil
+  })());
+});
+
+// Optional: allow pages to request skipWaiting() explicitly
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Fetch: network-first for HTML, cache-first for everything else
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-
-  // Only handle GET
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
@@ -75,42 +68,30 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.html');
 
   if (isHTML) {
-    // Network-first for pages (so updates appear when online)
-    event.respondWith(
-      (async () => {
-        try {
-          const net = await fetch(req, { cache: 'no-cache' });
-          // Update cache in the background
+    event.respondWith((async () => {
+      try {
+        const net = await fetch(req, { cache: 'no-cache' });
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(req, net.clone()).catch(() => {});
+        return net;
+      } catch {
+        return (await caches.match(req)) || (await caches.match('./index.html'));
+      }
+    })());
+  } else {
+    event.respondWith((async () => {
+      const cached = await caches.match(req, { ignoreSearch: false });
+      if (cached) return cached;
+      try {
+        const net = await fetch(req);
+        if (net && net.ok) {
           const cache = await caches.open(CACHE_NAME);
           cache.put(req, net.clone()).catch(() => {});
-          return net;
-        } catch {
-          // Offline fallback
-          const cacheMatch =
-            (await caches.match(req)) || (await caches.match('./index.html'));
-          return cacheMatch;
         }
-      })()
-    );
-  } else {
-    // Cache-first for static assets (icons, JS, CSS, CDN libs)
-    event.respondWith(
-      (async () => {
-        const cached = await caches.match(req, { ignoreSearch: false });
-        if (cached) return cached;
-        try {
-          const net = await fetch(req);
-          // Cache successful GET responses
-          if (net && net.ok) {
-            const cache = await caches.open(CACHE_NAME);
-            cache.put(req, net.clone()).catch(() => {});
-          }
-          return net;
-        } catch {
-          // Last-resort fallback to root if it helps
-          return caches.match('./index.html');
-        }
-      })()
-    );
+        return net;
+      } catch {
+        return caches.match('./index.html');
+      }
+    })());
   }
 });
