@@ -4,39 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>🥊 Boxing Timer</title>
-
-  <!-- PWA essentials -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f172a">
-
   <style>
     html, body { height: 100%; overflow: hidden; } /* no scrollbars */
     :root { --pad: clamp(12px, 1.5vw, 20px); }
     details > summary { cursor: pointer; }
     button:focus-visible { outline: 3px solid rgba(16,185,129,.6); outline-offset: 2px; }
   </style>
-
-  <!-- React + Babel from CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Register service worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-          .catch(err => console.error('SW registration failed:', err));
-      });
-    }
-  </script>
 </head>
 <body class="bg-slate-900 text-white">
   <div id="root" class="h-full"></div>
 
   <script type="text/babel">
-    const APP_VERSION = "v9";  // match your CACHE_VERSION
     const { useEffect, useRef, useState } = React;
 
     const SETTINGS_KEY = "boxingTimerSettings:v15";
@@ -452,17 +434,13 @@
         <div className="h-full w-full">
           <div className="h-full w-full flex items-center justify-center p-[var(--pad)]">
             <div className="w-full max-w-5xl h-full flex flex-col gap-3">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <h1 className="text-[clamp(18px,2.5vw,28px)] font-bold">
-                    🥊 Boxing Timer <span className="ml-2 text-xs font-normal opacity-70">{APP_VERSION}</span>
-                  </h1>
-                  {mode==="RUN" && phase!=="DONE" && (
-                    <div className="text-sm opacity-80">
-                      {phase==='WARMUP'?'Warm-up': phase==='WORK'?`Round ${round} / ${totalRounds}`: 'Rest'}
-                    </div>
-                  )}
-                </div>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h1 className="text-[clamp(18px,2.5vw,28px)] font-bold">🥊 Boxing Timer</h1>
+                {mode==="RUN" && phase!=="DONE" && (
+                  <div className="text-sm opacity-80">{phase==='WARMUP'?'Warm-up': phase==='WORK'?`Round ${round} / ${totalRounds}`: 'Rest'}</div>
+                )}
+              </div>
 
               {/* MAIN CARD */}
               <div className="flex-1 min-h-0">
@@ -590,7 +568,7 @@
                         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                           <button onClick={toggleRun}
                                   className="px-4 py-2 rounded-2xl bg-black/30 backdrop-blur border border-white/30 hover:bg-black/40 font-semibold">
-                            {isRunning?"Pause":"Resume"}
+                            {isRunning?"Pause (Space)":"Resume (Space)"}
                           </button>
 
                           <div className="flex items-center gap-3 bg-black/20 border border-white/30 rounded-2xl px-3 py-2">
@@ -605,8 +583,9 @@
                           </div>
 
                           <button onClick={doResetToSetup}
+                                  title="Settings (Enter)"
                                   className="px-3 py-2 rounded-2xl bg-black/20 border border-white/30 hover:bg-black/30">
-                            Settings
+                            Settings (Enter)
                           </button>
                         </div>
                       </div>

@@ -1,8 +1,7 @@
 {
   "name": "12‑Round Boxing Timer",
   "short_name": "BoxingTimer",
-  "start_url": "/Timer/",
-  "scope": "/Timer/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
