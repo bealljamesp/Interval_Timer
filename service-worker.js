@@ -1,7 +1,7 @@
 // service-worker.js
 // Offline cache for Boxing Timer PWA
 
-const CACHE_VERSION = 'v7'; // bump when you ship updates
+const CACHE_VERSION = 'v8'; // bump when you ship updates
 const CACHE_NAME = `boxing-timer-${CACHE_VERSION}`;
 
 const ASSETS = [
