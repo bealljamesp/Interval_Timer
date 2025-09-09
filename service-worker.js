@@ -2,7 +2,7 @@
 // Offline cache for Boxing Timer PWA
 
 // Bump this when you change index.html/manifest or want to force an update
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `boxing-timer-${CACHE_VERSION}`;
 
 // NOTE: If you host at https://<user>.github.io/Timer/
