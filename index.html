@@ -20,7 +20,7 @@
 
   <script type="text/babel">
     const { useEffect, useRef, useState } = React;
-
+	  const APP_VERSION = "v10";
     const SETTINGS_KEY = "boxingTimerSettings:v15";
     const DEFAULTS = {
       totalRounds: 12,
@@ -436,7 +436,8 @@
             <div className="w-full max-w-5xl h-full flex flex-col gap-3">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h1 className="text-[clamp(18px,2.5vw,28px)] font-bold">🥊 Boxing Timer</h1>
+                <h1 className="text-[clamp(18px,2.5vw,28px)] font-bold">🥊 Boxing Timer<span className="ml-2 text-xs font-normal opacity-70">{APP_VERSION}</span>
+                </h1>
                 {mode==="RUN" && phase!=="DONE" && (
                   <div className="text-sm opacity-80">{phase==='WARMUP'?'Warm-up': phase==='WORK'?`Round ${round} / ${totalRounds}`: 'Rest'}</div>
                 )}
