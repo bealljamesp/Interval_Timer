@@ -1,0 +1,30 @@
+PERSONAL USE LICENSE AGREEMENT
+
+This software ("Boxing Timer") is licensed, not sold. By installing,
+copying, or using this software, you agree to the following terms:
+
+1. GRANT OF LICENSE
+   You are granted a non-exclusive, non-transferable license to install
+   and use this software for your own personal, non-commercial use only.
+
+2. RESTRICTIONS
+   - You may not distribute, sell, rent, lease, lend, or sublicense the software.
+   - You may not modify, reverse engineer, decompile, or disassemble the software.
+   - You may not use the software for any commercial purpose without prior written permission.
+
+3. OWNERSHIP
+   The software remains the intellectual property of the author.
+   All rights not expressly granted are reserved.
+
+4. DISCLAIMER OF WARRANTY
+   This software is provided "AS IS," without warranty of any kind,
+   express or implied. Use of the software is at your own risk.
+
+5. LIMITATION OF LIABILITY
+   In no event shall the author be liable for any damages arising out
+   of the use or inability to use the software.
+
+By installing and using this software, you acknowledge that you have
+read, understood, and agreed to this Personal Use License Agreement.
+
+James B 20250908
