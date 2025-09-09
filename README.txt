@@ -222,3 +222,9 @@ Bump commands -
 	git add .
 	git commit -m "Bump version to v11"
 	git push
+
+# one-time bypass if execution policy blocks it:
+powershell -ExecutionPolicy Bypass -File .\bump-version.ps1 -NewVersion v11
+
+# then build
+npm run dist

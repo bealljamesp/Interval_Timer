@@ -1,15 +1,17 @@
 {
   "name": "boxing-timer-desktop",
-  "version": "11.0.0",
+  "version": "12.0.0",
   "main": "main.js",
   "productName": "Boxing Timer",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder -w"
+    "dist": "electron-builder -w",
+    "release": "standard-version"
   },
   "devDependencies": {
     "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "standard-version": "^9.5.0"
   },
   "build": {
     "appId": "com.yourname.boxingtimer",
@@ -29,7 +31,9 @@
       "buildResources": "build"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico",
       "artifactName": "Boxing Timer Setup ${version}.${ext}"
     },

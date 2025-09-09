@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>🥊 Boxing Timer</title>
+  <title>💪 Exercise Timer</title>
   <style>
     html, body { height: 100%; overflow: hidden; } /* no scrollbars */
     :root { --pad: clamp(12px, 1.5vw, 20px); }
@@ -20,17 +20,21 @@
 
   <script type="text/babel">
     const { useEffect, useRef, useState } = React;
-	  const APP_VERSION = "v11";
-    const SETTINGS_KEY = "boxingTimerSettings:v15";
+
+    /* ===== Version & Storage ===== */
+    const APP_VERSION = "v12";
+    const SETTINGS_KEY = "exerciseTimerSettings:v15"; // new key to avoid mixing with "boxing"
+
+    /* ===== Defaults ===== */
     const DEFAULTS = {
-      totalRounds: 12,
+      totalSets: 12,
       workMin: 3, workSec: 0,
       restSec: 60,
       warmupSec: 30,
       enableWarmup: true,
       warningSec: 10,
       enableWarning: true,
-      finishChime: true, // no toggle in UI, still plays at end
+      finishChime: true, // auto at end
       soundOn: true,
       volume: 75,
       theme: "emerald-sky-amber",
@@ -42,6 +46,7 @@
       }
     };
 
+    /* ===== Color Palettes ===== */
     const PALETTES = {
       "emerald-sky-amber": {
         label: "Default (Emerald / Sky / Amber)",
@@ -74,6 +79,7 @@
       "custom": { label: "Custom (pick your own)" }
     };
 
+    /* ===== Load/Save ===== */
     const loadSettings = () => {
       try {
         const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
@@ -82,7 +88,7 @@
     };
     const saveSettings = (obj) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj));
 
-    // ---- Wake Lock helpers (web/PWA) ----
+    /* ===== Wake Lock (web/PWA) ===== */
     let screenLock = null;
     async function webWakeStart() {
       try { if ('wakeLock' in navigator && navigator.wakeLock.request) screenLock = await navigator.wakeLock.request('screen'); } catch {}
@@ -98,11 +104,11 @@
     function App(){
       const initial = loadSettings();
 
-      // view mode
+      /* View mode */
       const [mode, setMode] = useState("SETUP"); // SETUP | RUN
 
-      // knobs
-      const [totalRounds, setTotalRounds] = useState(initial.totalRounds);
+      /* Knobs */
+      const [totalSets, setTotalSets] = useState(initial.totalSets);
       const [workMin, setWorkMin] = useState(initial.workMin);
       const [workSec, setWorkSec] = useState(initial.workSec);
       const [restSec, setRestSec] = useState(initial.restSec);
@@ -111,32 +117,32 @@
       const [warningSec, setWarningSec] = useState(initial.warningSec);
       const [enableWarning, setEnableWarning] = useState(initial.enableWarning);
 
-      // sound + prefs
+      /* Sound + prefs */
       const [soundOn, setSoundOn] = useState(initial.soundOn);
       const [volume, setVolume] = useState(initial.volume);
       const [theme, setTheme] = useState(initial.theme);
       const [customColors, setCustomColors] = useState(initial.customColors);
 
-      // runtime
+      /* Runtime */
       const [isRunning, setIsRunning] = useState(false);
-      const [phase, setPhase] = useState(enableWarmup ? "WARMUP" : "WORK");
-      const [round, setRound] = useState(enableWarmup ? 0 : 1);
+      const [phase, setPhase] = useState(enableWarmup ? "WARMUP" : "WORK"); // WARMUP | WORK | REST | DONE
+      const [setNum, setSetNum] = useState(enableWarmup ? 0 : 1);
       const [remaining, setRemaining] = useState(enableWarmup ? warmupSec : (workMin*60 + workSec));
 
       const workTotal = workMin*60 + workSec;
       const restTotal = restSec;
 
-      // persist settings
+      /* Persist settings */
       useEffect(() => {
         saveSettings({
-          totalRounds, workMin, workSec, restSec,
+          totalSets, workMin, workSec, restSec,
           warmupSec, enableWarmup,
           warningSec, enableWarning,
           soundOn, volume, theme, customColors
         });
-      }, [totalRounds, workMin, workSec, restSec, warmupSec, enableWarmup, warningSec, enableWarning, soundOn, volume, theme, customColors]);
+      }, [totalSets, workMin, workSec, restSec, warmupSec, enableWarmup, warningSec, enableWarning, soundOn, volume, theme, customColors]);
 
-      // sync remaining when paused or in SETUP
+      /* Sync remaining when paused or in SETUP */
       useEffect(() => {
         if (!isRunning || mode === "SETUP") {
           if (phase === "WARMUP") setRemaining(enableWarmup ? warmupSec : workTotal);
@@ -145,7 +151,7 @@
         }
       }, [workMin, workSec, restSec, warmupSec, enableWarmup, mode]);
 
-      // audio
+      /* ===== Audio ===== */
       const audioCtxRef = useRef(null);
       const masterGainRef = useRef(null);
       const ensureAudio = () => {
@@ -195,12 +201,10 @@
         const t=ctx.currentTime; hit(660,t,0.6); hit(440,t+0.02,0.55); hit(880,t+0.04,0.45);
       };
 
-      // finish chime (auto at session end only)
       const playFinishChime = () => {
         ensureAudio();
         const ctx = audioCtxRef.current, master = masterGainRef.current;
         if (!ctx || !master || master.gain.value <= 0) return;
-
         const add=(type,freq,start,len,peak=0.7)=>{
           const o=ctx.createOscillator(), g=ctx.createGain();
           o.type=type; o.frequency.setValueAtTime(freq,start);
@@ -211,42 +215,43 @@
           o.start(start); o.stop(start+len+0.05);
         };
         const t = ctx.currentTime;
-        add('triangle', 784,  t,      1.2, 0.70); // G5
-        add('sine',     1047, t+0.02, 0.9, 0.45); // C6
-        add('triangle', 659,  t+0.04, 1.0, 0.55); // E5
-        add('sine',     523,  t+0.50, 0.8, 0.25); // C5
+        add('triangle', 784,  t,      1.2, 0.70);
+        add('sine',     1047, t+0.02, 0.9, 0.45);
+        add('triangle', 659,  t+0.04, 1.0, 0.55);
+        add('sine',     523,  t+0.50, 0.8, 0.25);
       };
 
-      // timer loop (RUN)
+      /* ===== Timer loop ===== */
       useEffect(() => {
         if (mode !== "RUN" || !isRunning || phase === 'DONE') return;
         const id = setInterval(() => setRemaining(s => Math.max(0, s - 1)), 1000);
         return () => clearInterval(id);
       }, [mode, isRunning, phase]);
 
-      // phase transitions + warning + finish
+      /* ===== Transitions + warning + finish ===== */
       useEffect(() => {
         if (mode !== "RUN" || phase === 'DONE') return;
+
         if (remaining === 0) {
           playBell();
           if (phase === 'WARMUP') {
-            setPhase('WORK'); setRound(1); setRemaining(workTotal);
+            setPhase('WORK'); setSetNum(1); setRemaining(workTotal);
           } else if (phase === 'WORK') {
-            if (round >= totalRounds) {
+            if (setNum >= totalSets) {
               setPhase('DONE'); setIsRunning(false);
-              setTimeout(() => playFinishChime(), 50); // auto on completion
+              setTimeout(() => playFinishChime(), 50);
             } else {
               setPhase('REST'); setRemaining(restTotal);
             }
           } else if (phase === 'REST') {
-            setPhase('WORK'); setRound(r => r + 1); setRemaining(workTotal);
+            setPhase('WORK'); setSetNum(n => n + 1); setRemaining(workTotal);
           }
         } else if (enableWarning && (phase === 'WORK' || phase === 'WARMUP') && remaining === warningSec) {
           playBeep(880,0.08); setTimeout(()=>playBeep(880,0.08),160); setTimeout(()=>playBeep(880,0.08),320);
         }
-      }, [mode, remaining, enableWarning, round, totalRounds, phase]);
+      }, [mode, remaining, enableWarning, setNum, totalSets, phase]);
 
-      // keyboard shortcuts
+      /* ===== Keyboard shortcuts ===== */
       useEffect(() => {
         const onKey = (e) => {
           const k = e.key.toLowerCase();
@@ -258,7 +263,7 @@
             } else {
               if (e.code === 'Space') { e.preventDefault(); toggleRun(); }
               else if (e.code === 'Enter') { e.preventDefault(); doResetToSetup(); }
-              else if (k === 'n') { e.preventDefault(); setRemaining(0); }
+              else if (k === 'n') { e.preventDefault(); setRemaining(0); } // next
             }
           }
         };
@@ -266,21 +271,21 @@
         return () => window.removeEventListener('keydown', onKey);
       }, [mode, isRunning, phase]);
 
-      // document title
+      /* ===== Title ===== */
       useEffect(() => {
-        if (mode === "SETUP") { document.title = "Boxing Timer • Setup"; return; }
-        if (phase === "DONE") { document.title = "Finished • Boxing Timer"; return; }
+        if (mode === "SETUP") { document.title = "Exercise Timer • Setup"; return; }
+        if (phase === "DONE") { document.title = "Finished • Exercise Timer"; return; }
         const t = formatClock(remaining);
-        const p = phase === 'WORK' ? `R${round}` : phase;
-        document.title = `${t} • ${p} • Boxing Timer`;
-      }, [mode, remaining, phase, round]);
+        const p = phase === 'WORK' ? `S${setNum}` : phase;
+        document.title = `${t} • ${p} • Exercise Timer`;
+      }, [mode, remaining, phase, setNum]);
 
       const totalPhase = phase==='WORK'?workTotal: phase==='REST'?restTotal: phase==='WARMUP'?warmupSec:1;
       const progress = (1 - remaining/totalPhase) * 100;
 
-      // Summary helpers
-      const secsWorkTotal  = totalRounds * workTotal;
-      const secsRestTotal  = Math.max(0, totalRounds - 1) * restSec; // rests between rounds only
+      /* ===== Summary helpers ===== */
+      const secsWorkTotal  = totalSets * workTotal;
+      const secsRestTotal  = Math.max(0, totalSets - 1) * restSec; // rests between sets only
       const secsCombined   = secsWorkTotal + secsRestTotal;
       const fmtHMS = (s) => {
         const h = Math.floor(s/3600);
@@ -291,9 +296,10 @@
         return h>0 ? `${h}:${mm}:${sss}` : `${m}:${sss.padStart(2,'0')}`;
       };
 
+      /* ===== Actions ===== */
       async function startSession(){
         setPhase(enableWarmup ? "WARMUP" : "WORK");
-        setRound(enableWarmup ? 0 : 1);
+        setSetNum(enableWarmup ? 0 : 1);
         setRemaining(enableWarmup ? warmupSec : workTotal);
         setMode("RUN");
         setIsRunning(true);
@@ -319,7 +325,7 @@
       }
       function formatClock(s){ const m=String(Math.floor(s/60)).padStart(2,'0'); const ss=String(Math.floor(s%60)).padStart(2,'0'); return `${m}:${ss}`; }
 
-      // colors
+      /* ===== Colors ===== */
       const getPhaseColors = (p) => {
         if (theme === "custom") return customColors[p];
         const pal = PALETTES[theme] || PALETTES["emerald-sky-amber"];
@@ -330,7 +336,7 @@
         return { backgroundImage: `linear-gradient(135deg, ${start}, ${end})` };
       };
 
-      // UI atoms
+      /* ===== UI atoms ===== */
       const Field = ({label, children}) => (
         <label className="bg-slate-900/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col gap-2">
           <span className="text-sm text-slate-200/90">{label}</span>{children}
@@ -368,9 +374,8 @@
         </div>
       );
 
-      // Defaults button handler
       function applyDefaults(){
-        setTotalRounds(DEFAULTS.totalRounds);
+        setTotalSets(DEFAULTS.totalSets);
         setWorkMin(DEFAULTS.workMin);
         setWorkSec(DEFAULTS.workSec);
         setRestSec(DEFAULTS.restSec);
@@ -380,13 +385,13 @@
         setEnableWarning(DEFAULTS.enableWarning);
       }
 
-      // ---- RENDER ----
+      /* ===== Subviews ===== */
       const PhaseBanner = () => (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="text-[clamp(28px,8vw,56px)] font-extrabold tracking-wide drop-shadow">
               {phase==='WARMUP' ? 'Warm-up'
-               : phase==='WORK' ? `Round ${round} / ${totalRounds}`
+               : phase==='WORK' ? `Set ${setNum} / ${totalSets}`
                : phase==='REST' ? 'Rest'
                : 'Finished'}
             </div>
@@ -406,54 +411,54 @@
 
       const FinishedView = () => (
         <div className="h-full rounded-3xl shadow-xl p-4 md:p-6 relative overflow-hidden flex flex-col" style={phaseStyle('DONE')}>
-          {/* Big clickable FINISHED button (no chime here) */}
           <div className="flex-1 min-h-0">
             <button
               onClick={doResetToSetup}
-              title="Back to Settings (Space)"
               className="w-full h-full rounded-3xl bg-black/25 hover:bg-black/35 active:bg-black/40 border border-white/40 backdrop-blur
                          flex items-center justify-center text-[clamp(28px,8vw,56px)] font-extrabold tracking-wide">
               Finished
             </button>
           </div>
 
-          {/* Summary */}
           <div className="mt-4 bg-black/25 border border-white/30 rounded-2xl px-4 py-3 text-sm md:text-base">
             <div className="opacity-90 font-semibold">Summary</div>
-            <div className="h-3"></div> {/* blank line after Summary */}
+            <div className="h-3"></div>
             <div className="space-y-1 text-left">
-              <div><span className="opacity-70">Rounds:</span> {totalRounds} × {workMin}:{String(workSec).padStart(2,'0')} = <b>{fmtHMS(secsWorkTotal)}</b></div>
-              <div><span className="opacity-70">Rests (between rounds):</span> {Math.max(0,totalRounds-1)} × {restSec}s = <b>{fmtHMS(secsRestTotal)}</b></div>
-              <div><span className="opacity-70">Total (rounds + rests):</span> <b>{fmtHMS(secsCombined)}</b></div>
+              <div><span className="opacity-70">Sets:</span> {totalSets} × {workMin}:{String(workSec).padStart(2,'0')} = <b>{fmtHMS(secsWorkTotal)}</b></div>
+              <div><span className="opacity-70">Rests (between sets):</span> {Math.max(0,totalSets-1)} × {restSec}s = <b>{fmtHMS(secsRestTotal)}</b></div>
+              <div><span className="opacity-70">Total (sets + rests):</span> <b>{fmtHMS(secsCombined)}</b></div>
             </div>
           </div>
         </div>
       );
 
+      /* ===== Render ===== */
       return (
         <div className="h-full w-full">
           <div className="h-full w-full flex items-center justify-center p-[var(--pad)]">
             <div className="w-full max-w-5xl h-full flex flex-col gap-3">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h1 className="text-[clamp(18px,2.5vw,28px)] font-bold">🥊 Boxing Timer<span className="ml-2 text-xs font-normal opacity-70">{APP_VERSION}</span>
+                <h1 className="text-[clamp(18px,2.5vw,28px)] font-bold">
+                  💪 Exercise Timer <span className="ml-2 text-xs font-normal opacity-70">{APP_VERSION}</span>
                 </h1>
                 {mode==="RUN" && phase!=="DONE" && (
-                  <div className="text-sm opacity-80">{phase==='WARMUP'?'Warm-up': phase==='WORK'?`Round ${round} / ${totalRounds}`: 'Rest'}</div>
+                  <div className="text-sm opacity-80">
+                    {phase==='WARMUP'?'Warm-up': phase==='WORK'?`Set ${setNum} / ${totalSets}`: 'Rest'}
+                  </div>
                 )}
               </div>
 
-              {/* MAIN CARD */}
+              {/* Main Card */}
               <div className="flex-1 min-h-0">
                 {mode === "SETUP" ? (
                   /* -------- SETUP SCREEN -------- */
                   <div className="h-full rounded-3xl shadow-xl p-4 md:p-6 relative overflow-hidden flex flex-col"
                        style={phaseStyle("WORK")}>
-                    {/* Big Start button (fills space) */}
+                    {/* Big Start button */}
                     <div className="flex-1 min-h-0">
                       <button
                         onClick={startSession}
-                        title="Start (Space)"
                         className="w-full h-full rounded-3xl bg-black/25 hover:bg-black/35 active:bg-black/40 border border-white/40 backdrop-blur
                                    flex items-center justify-center text-[clamp(28px,8vw,56px)] font-extrabold tracking-wide">
                         Start
@@ -462,12 +467,12 @@
 
                     {/* 2×3 Tiles */}
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {/* 1: Rounds + Rest */}
-                      <Field label="Rounds & Rest (sec)">
+                      {/* 1: Sets + Rest */}
+                      <Field label="Sets & Rest (sec)">
                         <div className="flex flex-nowrap items-center gap-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm">Rounds</span>
-                            <NumberInput value={totalRounds} min={1} max={30} onChange={setTotalRounds}/>
+                            <span className="text-sm">Sets</span>
+                            <NumberInput value={totalSets} min={1} max={30} onChange={setTotalSets}/>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm">Rest</span>
@@ -476,8 +481,8 @@
                         </div>
                       </Field>
 
-                      {/* 2: Round Length */}
-                      <Field label="Round Length (mm:ss)">
+                      {/* 2: Set Length */}
+                      <Field label="Set Length (mm:ss)">
                         <div className="flex gap-2">
                           <NumberInput value={workMin} min={0} max={20} onChange={setWorkMin}/>
                           <span className="self-center">:</span>
@@ -542,7 +547,6 @@
                                 className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700">
                           Restore Default Settings
                         </button>
-                        {/* no descriptive blurb here per request */}
                       </Field>
                     </div>
                   </div>
@@ -569,7 +573,7 @@
                         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                           <button onClick={toggleRun}
                                   className="px-4 py-2 rounded-2xl bg-black/30 backdrop-blur border border-white/30 hover:bg-black/40 font-semibold">
-                            {isRunning?"Pause (Space)":"Resume (Space)"}
+                            {isRunning?"Pause":"Resume"}
                           </button>
 
                           <div className="flex items-center gap-3 bg-black/20 border border-white/30 rounded-2xl px-3 py-2">
@@ -584,9 +588,8 @@
                           </div>
 
                           <button onClick={doResetToSetup}
-                                  title="Settings (Enter)"
                                   className="px-3 py-2 rounded-2xl bg-black/20 border border-white/30 hover:bg-black/30">
-                            Settings (Enter)
+                            Settings
                           </button>
                         </div>
                       </div>
@@ -607,3 +610,4 @@
   </script>
 </body>
 </html>
+

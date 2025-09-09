@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = `boxing-timer-${CACHE_VERSION}`;
 const ASSETS = ['.', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))); });
@@ -10,3 +10,4 @@ self.addEventListener('activate', (event) => {
     await self.clients.claim(); // <- important
   })());
 });
+
