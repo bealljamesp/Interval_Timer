@@ -4,16 +4,33 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>🥊 Boxing Timer</title>
+
+  <!-- PWA essentials -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+
   <style>
     html, body { height: 100%; overflow: hidden; } /* no scrollbars */
     :root { --pad: clamp(12px, 1.5vw, 20px); }
     details > summary { cursor: pointer; }
     button:focus-visible { outline: 3px solid rgba(16,185,129,.6); outline-offset: 2px; }
   </style>
+
+  <!-- React + Babel from CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Register service worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .catch(err => console.error('SW registration failed:', err));
+      });
+    }
+  </script>
 </head>
 <body class="bg-slate-900 text-white">
   <div id="root" class="h-full"></div>
