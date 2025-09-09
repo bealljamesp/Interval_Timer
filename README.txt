@@ -228,3 +228,26 @@ powershell -ExecutionPolicy Bypass -File .\bump-version.ps1 -NewVersion v11
 
 # then build
 npm run dist
+
+You can make as many commits as you want before bumping. Each one gets its own message:
+
+# First change
+git add index.html
+git commit -m "feat(timer): add pause/resume button"
+
+# Second change
+git add service-worker.js
+git commit -m "fix(pwa): bump cache version to avoid stale app"
+
+# Third change
+git add styles.css
+git commit -m "chore(ui): adjust button spacing"
+
+
+Then once you’re happy with all changes, bump:
+
+.\bump-version.ps1 -NewVersion v12
+git push --follow-tags
+
+
+👉 All 3 commits will be grouped into the v12 section in your CHANGELOG.md.
