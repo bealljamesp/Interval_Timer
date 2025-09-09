@@ -585,7 +585,7 @@
                         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                           <button onClick={toggleRun}
                                   className="px-4 py-2 rounded-2xl bg-black/30 backdrop-blur border border-white/30 hover:bg-black/40 font-semibold">
-                            {isRunning?"Pause (Space)":"Resume (Space)"}
+                            {isRunning?"Pause":"Resume"}
                           </button>
 
                           <div className="flex items-center gap-3 bg-black/20 border border-white/30 rounded-2xl px-3 py-2">
@@ -600,9 +600,8 @@
                           </div>
 
                           <button onClick={doResetToSetup}
-                                  title="Settings (Enter)"
                                   className="px-3 py-2 rounded-2xl bg-black/20 border border-white/30 hover:bg-black/30">
-                            Settings (Enter)
+                            Settings
                           </button>
                         </div>
                       </div>
