@@ -1,4 +1,8 @@
 ## 13.0.0 - 2025-09-09
+### Other
+- update readme with git commands
+
+## 13.0.0 - 2025-09-09
 - minor maintenance
 
 # Changelog
