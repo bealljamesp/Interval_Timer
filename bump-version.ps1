@@ -1,20 +1,36 @@
 param(
   [Parameter(Mandatory=$true)]
-  [string]$NewVersion
+  [string]$NewVersion   # e.g. v11 or 11 or 11.2.3
 )
 
-Write-Host "Bumping version to $NewVersion..."
+Write-Host "Bumping versions… input = $NewVersion"
 
-# 1. Update index.html (APP_VERSION)
-(Get-Content index.html) -replace 'const APP_VERSION = "v[0-9]+"' , "const APP_VERSION = `"$NewVersion`"" |
-  Set-Content index.html
+# Derive display and semver
+$display = $NewVersion
+$semver = $NewVersion.TrimStart('v')
 
-# 2. Update service-worker.js (CACHE_VERSION)
-(Get-Content service-worker.js) -replace "const CACHE_VERSION = 'v[0-9]+'", "const CACHE_VERSION = '$NewVersion'" |
-  Set-Content service-worker.js
+# Normalize to X.Y.Z
+if ($semver -match '^\d+$') {
+  $semver = "$semver.0.0"
+} elseif ($semver -match '^\d+\.\d+$') {
+  $semver = "$semver.0"
+} elseif ($semver -notmatch '^\d+\.\d+\.\d+$') {
+  throw "Invalid version format: $NewVersion. Use vNN, NN, NN.NN, or NN.NN.NN"
+}
 
-# 3. Update package.json version
-(Get-Content package.json) -replace '"version":\s*"[0-9\.]+"' , "`"version`": `"$NewVersion`"" |
-  Set-Content package.json
+# 1) index.html APP_VERSION
+(Get-Content index.html -Raw) `
+  -replace 'const APP_VERSION\s*=\s*"(?:v)?\d+(?:\.\d+){0,2}"', "const APP_VERSION = `"$display`"" `
+  | Set-Content index.html
 
-Write-Host "✅ Versions updated to $NewVersion."
+# 2) service-worker.js CACHE_VERSION
+(Get-Content service-worker.js -Raw) `
+  -replace "const CACHE_VERSION\s*=\s*'[^']+'", "const CACHE_VERSION = '$display'" `
+  | Set-Content service-worker.js
+
+# 3) package.json version (SemVer only)
+(Get-Content package.json -Raw) `
+  -replace '"version"\s*:\s*"[^\"]+"', "`"version`": `"$semver`"" `
+  | Set-Content package.json
+
+Write-Host "✅ Set APP_VERSION/CACHE_VERSION to $display and package.json version to $semver"
