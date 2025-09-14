@@ -23,7 +23,7 @@
 
     /* ===== Version & Storage ===== */
     const APP_VERSION = "v13";
-    const SETTINGS_KEY = "exerciseTimerSettings:v15"; // new key to avoid mixing with "boxing"
+    const SETTINGS_KEY = "exerciseTimerSettings:v15";
 
     /* ===== Defaults ===== */
     const DEFAULTS = {
@@ -149,7 +149,7 @@
           else if (phase === "WORK") setRemaining(workTotal);
           else if (phase === "REST") setRemaining(restTotal);
         }
-      }, [workMin, workSec, restSec, warmupSec, enableWarmup, mode]);
+      }, [workMin, workSec, restSec, warmupSec, enableWarmup, mode, phase]);
 
       /* ===== Audio ===== */
       const audioCtxRef = useRef(null);
@@ -249,7 +249,7 @@
         } else if (enableWarning && (phase === 'WORK' || phase === 'WARMUP') && remaining === warningSec) {
           playBeep(880,0.08); setTimeout(()=>playBeep(880,0.08),160); setTimeout(()=>playBeep(880,0.08),320);
         }
-      }, [mode, remaining, enableWarning, setNum, totalSets, phase]);
+      }, [mode, remaining, enableWarning, setNum, totalSets, phase, warningSec, workTotal, restTotal]);
 
       /* ===== Keyboard shortcuts ===== */
       useEffect(() => {
@@ -453,19 +453,23 @@
               <div className="flex-1 min-h-0">
                 {mode === "SETUP" ? (
                   /* -------- SETUP SCREEN -------- */
-                  <div className="h-full rounded-3xl shadow-xl p-4 md:p-6 relative overflow-hidden flex flex-col"
-                       style={phaseStyle("WORK")}>
-                    {/* Big Start button */}
+                  <div
+                    className="h-full rounded-3xl shadow-xl p-4 md:p-6 relative overflow-hidden flex flex-col pb-[150px] md:pb-0"
+                    style={phaseStyle("WORK")}
+                  >
+                    {/* Big Start button (fills space) */}
                     <div className="flex-1 min-h-0">
                       <button
                         onClick={startSession}
+                        title="Start (Space)"
                         className="w-full h-full rounded-3xl bg-black/25 hover:bg-black/35 active:bg-black/40 border border-white/40 backdrop-blur
-                                   flex items-center justify-center text-[clamp(28px,8vw,56px)] font-extrabold tracking-wide">
+                                   flex items-center justify-center text-[clamp(28px,8vw,56px)] font-extrabold tracking-wide"
+                      >
                         Start
                       </button>
                     </div>
 
-                    {/* 2×3 Tiles */}
+                    {/* 2×3 Tiles (without Color Theme) */}
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                       {/* 1: Sets + Rest */}
                       <Field label="Sets & Rest (sec)">
@@ -512,11 +516,29 @@
                         </div>
                       </Field>
 
-                      {/* 5: Color Theme */}
+                      {/* 5: Defaults */}
+                      <Field label="Defaults">
+                        <button
+                          onClick={applyDefaults}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700"
+                        >
+                          Restore Default Settings
+                        </button>
+                      </Field>
+                    </div>
+
+                    {/* PINNED: Color Theme (bottom-left) */}
+                    <div
+                      className="absolute left-4 right-4 md:right-auto bottom-4 md:bottom-6 z-10 md:w-[calc(50%-0.375rem)]"
+                    >
+                      {/* half width minus 6px gap on desktop */}
                       <Field label="Color Theme">
                         <div className="flex flex-col gap-2">
-                          <select value={theme} onChange={e=>setTheme(e.target.value)}
-                                  className="w-full rounded-xl px-3 py-2 bg-slate-800 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/60">
+                          <select
+                            value={theme}
+                            onChange={e=>setTheme(e.target.value)}
+                            className="w-full rounded-xl px-3 py-2 bg-slate-800 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+                          >
                             {Object.entries(PALETTES).map(([k,v]) => (
                               <option key={k} value={k}>{v.label}</option>
                             ))}
@@ -531,22 +553,16 @@
                                 <ColorRow phaseKey="WORK"   label="Work" />
                                 <ColorRow phaseKey="REST"   label="Rest" />
                                 <ColorRow phaseKey="DONE"   label="Done" />
-                                <button className="mt-2 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-white/10"
-                                        onClick={()=>setCustomColors(DEFAULTS.customColors)}>
+                                <button
+                                  className="mt-2 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-white/10"
+                                  onClick={()=>setCustomColors(DEFAULTS.customColors)}
+                                >
                                   Reset Custom Colors
                                 </button>
                               </div>
                             </details>
                           )}
                         </div>
-                      </Field>
-
-                      {/* 6: Default Settings */}
-                      <Field label="Defaults">
-                        <button onClick={applyDefaults}
-                                className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700">
-                          Restore Default Settings
-                        </button>
                       </Field>
                     </div>
                   </div>
@@ -610,4 +626,3 @@
   </script>
 </body>
 </html>
-
