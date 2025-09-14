@@ -1,3 +1,12 @@
+## 2.0.0 - 2025-09-14
+### Chores
+- v13.0.0
+- v13.0.0
+
+### Other
+- pinned color options to bottom right
+- update readme with git commands
+
 ## 13.0.0 - 2025-09-14
 ### Chores
 - v13.0.0
