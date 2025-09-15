@@ -1,50 +1,83 @@
+<#
+bump-version.ps1
+Updates:
+- package.json "version" (SemVer only, strips any leading "v")
+- index.html APP_VERSION constant
+- service-worker.js CACHE_VERSION (forces PWA refresh)
+- CHANGELOG.md (prepends new section with commit messages since last tag or recent history)
+
+Usage:
+  .\bump-version.ps1 -NewVersion v13
+#>
+
 param(
-  [Parameter(Mandatory = $true)]
-  [string]$NewVersion,      # accepts v12, 12, 12.3, 12.3.4, v12.3.4
-  [switch]$NoCommit,
-  [switch]$NoTag
+  [Parameter(Mandatory=$true)]
+  [string]$NewVersion,
+  [int]$HistoryFallbackCount = 100
 )
 
-function Normalize-SemVer([string]$v) {
-  $display = $v
-  if ($display -notmatch '^[vV]') { $display = "v$display" }
-
-  $core = $v -replace '^[vV]', ''
-  if ($core -match '^\d+$') {
-    $core = "$core.0.0"
-  } elseif ($core -match '^\d+\.\d+$') {
-    $core = "$core.0"
-  } elseif ($core -notmatch '^\d+\.\d+\.\d+$') {
-    throw "NewVersion '$v' is not a valid SemVer (use v12, 12, 12.3, 12.3.4, or v12.3.4)."
+function Assert-Git {
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    throw "git not found on PATH. Install Git or open Git Bash/Developer PowerShell."
   }
+}
 
-  return @{ Display = $display; SemVer = $core }
+function Normalize-SemVer([string]$v) {
+  $v = $v.Trim()
+  if ($v -match '^[vV](.+)$') { $v = $Matches[1] }
+  if ($v -match '^\d+$') { return "$v.0.0" }
+  if ($v -match '^\d+\.\d+$') { return "$v.0" }
+  if ($v -match '^\d+\.\d+\.\d+$') { return $v }
+  throw "Invalid version: '$NewVersion'. Use like: 1, 1.2, 1.2.3, or v13."
+}
+
+function Read-JsonFile([string]$path) {
+  if (-not (Test-Path $path)) { throw "$path not found." }
+  return Get-Content $path -Raw | ConvertFrom-Json
+}
+
+function Write-Text([string]$path, [string]$content, [switch]$NoNewline=$false) {
+  $nn = $NoNewline.IsPresent
+  if ($nn) {
+    Set-Content -LiteralPath $path -Value $content -Encoding UTF8 -NoNewline
+  } else {
+    Set-Content -LiteralPath $path -Value $content -Encoding UTF8
+  }
+}
+
+function Update-PackageJson([string]$path, [string]$semver) {
+  $json = Read-JsonFile $path
+  $json.version = $semver
+  ($json | ConvertTo-Json -Depth 100) | Write-Text -path $path
+  Write-Host "ok: package.json version -> $semver"
 }
 
 function Update-IndexHtml([string]$path, [string]$display) {
   if (-not (Test-Path $path)) { Write-Host "skip: $path not found"; return }
   $text = Get-Content $path -Raw
-  if ($text -notmatch 'const\s+APP_VERSION\s*=\s*["'']') {
-    Write-Host "info: APP_VERSION not found; inserting near top of script."
-    $text = $text -replace '(<script[^>]*type="text/babel"[^>]*>\s*)', "`$1`n    const APP_VERSION = `"$display`";`n"
+  if ($text -notmatch 'const\s+APP_VERSION\s*=') {
+    # Insert just after the opening <script type="text/babel">
+    $text = $text -replace '(?s)(<script[^>]*type=["'']text/babel["''][^>]*>\s*)',
+        "`$1const APP_VERSION = `"$display`";`n"
   } else {
     $text = [regex]::Replace(
       $text,
-      'const\s+APP_VERSION\s*=\s*["''][^"'']+["'']\s*;',
-      "const APP_VERSION = `"$display`";",
+      'const\s+APP_VERSION\s*=\s*["''][^"'']+["'']',
+      "const APP_VERSION = `"$display`"",
       [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
     )
   }
-  Set-Content $path $text -NoNewline
+  Write-Text -path $path -content $text -NoNewline
   Write-Host "ok: index.html APP_VERSION -> $display"
 }
 
 function Update-ServiceWorker([string]$path, [string]$display) {
   if (-not (Test-Path $path)) { Write-Host "skip: $path not found"; return }
   $text = Get-Content $path -Raw
+
   if ($text -notmatch 'CACHE_VERSION') {
     Write-Host "info: CACHE_VERSION not found; adding near top."
-    $text = $text -replace '(^\s*//[^\n]*\n)', "`$1const CACHE_VERSION = '$display';`n"
+    $text = $text -replace '(^\s*(?://.*\R)*)', "`$1const CACHE_VERSION = '$display';`n"
   } else {
     $text = [regex]::Replace(
       $text,
@@ -53,127 +86,73 @@ function Update-ServiceWorker([string]$path, [string]$display) {
       [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
     )
   }
-  Set-Content $path $text -NoNewline
+
+  Write-Text -path $path -content $text -NoNewline
   Write-Host "ok: service-worker.js CACHE_VERSION -> $display"
 }
 
-function Update-PackageJson([string]$path, [string]$semver) {
-  if (-not (Test-Path $path)) { Write-Host "skip: $path not found"; return }
-  $json = Get-Content $path -Raw | ConvertFrom-Json
-  $json.version = $semver
-  $json | ConvertTo-Json -Depth 20 | Set-Content $path -NoNewline
-  Write-Host "ok: package.json version -> $semver"
-}
-
 function Get-LastTag() {
-  $tag = (& git describe --tags --abbrev=0 2>$null)
-  if ($LASTEXITCODE -ne 0) { return $null }
-  return $tag
+  $last = (& git describe --tags --abbrev=0 2>$null)
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($last)) { return $null }
+  return $last.Trim()
 }
 
-function Build-ChangelogSection([string]$sinceRef, [string]$version, [datetime]$date) {
-  $range = "HEAD"
-  if ($sinceRef) { $range = "$sinceRef..HEAD" }
-
-  $lines = & git log $range --pretty="%s"
-  if ($LASTEXITCODE -ne 0) { throw "git log failed" }
-
-  $groups = @{
-    feat     = New-Object System.Collections.Generic.List[string]
-    fix      = New-Object System.Collections.Generic.List[string]
-    perf     = New-Object System.Collections.Generic.List[string]
-    refactor = New-Object System.Collections.Generic.List[string]
-    docs     = New-Object System.Collections.Generic.List[string]
-    chore    = New-Object System.Collections.Generic.List[string]
-    build    = New-Object System.Collections.Generic.List[string]
-    ci       = New-Object System.Collections.Generic.List[string]
-    style    = New-Object System.Collections.Generic.List[string]
-    test     = New-Object System.Collections.Generic.List[string]
-    revert   = New-Object System.Collections.Generic.List[string]
-    other    = New-Object System.Collections.Generic.List[string]
-  }
-
-  foreach ($s in $lines) {
-    $m = [regex]::Match($s, '^(?<type>\w+)(\([^)]+\))?(!)?:\s*(?<msg>.+)$')
-    if ($m.Success) {
-      $t   = $m.Groups['type'].Value.ToLower()
-      $msg = $m.Groups['msg'].Value
-      if (-not $groups.ContainsKey($t)) { $t = 'other' }
-      $groups[$t].Add($msg)
-    } else {
-      $groups['other'].Add($s)
-    }
-  }
-
-  $sb = New-Object System.Text.StringBuilder
-  $dateStr = $date.ToString('yyyy-MM-dd')
-  [void]$sb.AppendLine("## $version - $dateStr")
-
-  $order = @('feat','fix','perf','refactor','docs','test','build','ci','style','chore','revert','other')
-  foreach ($t in $order) {
-    if ($groups[$t].Count -gt 0) {
-      $title = 'Other'
-      switch ($t) {
-        'feat'     { $title = 'Features' }
-        'fix'      { $title = 'Bug Fixes' }
-        'perf'     { $title = 'Performance' }
-        'refactor' { $title = 'Refactors' }
-        'docs'     { $title = 'Docs' }
-        'test'     { $title = 'Tests' }
-        'build'    { $title = 'Build' }
-        'ci'       { $title = 'CI' }
-        'style'    { $title = 'Style' }
-        'chore'    { $title = 'Chores' }
-        'revert'   { $title = 'Reverts' }
-      }
-      [void]$sb.AppendLine("### $title")
-      foreach ($msg in $groups[$t]) { [void]$sb.AppendLine("- $msg") }
-      [void]$sb.AppendLine()
-    }
-  }
-
-  if (-not $lines -or $lines.Count -eq 0) {
-    [void]$sb.AppendLine("- minor maintenance`n")
-  }
-
-  return $sb.ToString()
-}
-
-function Prepend-ToFile([string]$path, [string]$content, [string]$header = "# Changelog`n`n") {
-  if (Test-Path $path) {
-    $old = Get-Content $path -Raw
-    ($content + $old) | Set-Content $path -NoNewline
+function Get-CommitLines([string]$sinceRef, [int]$fallbackCount) {
+  if ($sinceRef) {
+    & git log "$sinceRef..HEAD" --pretty=format:"%s"
   } else {
-    ($header + $content) | Set-Content $path -NoNewline
+    & git log -n $fallbackCount --pretty=format:"%s"
   }
 }
 
-# --- MAIN ---
-$ver = Normalize-SemVer $NewVersion
-$display = $ver.Display
-$semver  = $ver.SemVer
+function Update-Changelog([string]$display, [int]$fallbackCount) {
+  $changelogPath = "CHANGELOG.md"
+  if (-not (Test-Path $changelogPath)) {
+    "# Changelog`n`nAll notable changes to this project will be documented in this file.`n" |
+      Write-Text -path $changelogPath
+  }
 
-Write-Host "Bumping to: UI=$display  package.json=$semver" -ForegroundColor Cyan
+  $lastTag = Get-LastTag
+  $sinceRef = $lastTag
+  $lines = Get-CommitLines -sinceRef $sinceRef -fallbackCount $fallbackCount
+  if (-not $lines) {
+    Write-Host "info: No commits found for changelog; creating empty section."
+    $section = "## $display - $(Get-Date -Format 'yyyy-MM-dd')`n`n- (no notable changes)`n`n"
+  } else {
+    $bullets = ($lines | ForEach-Object { "- $_" }) -join "`n"
+    $section = "## $display - $(Get-Date -Format 'yyyy-MM-dd')`n`n$bullets`n`n"
+  }
 
-Update-IndexHtml     -path "index.html"        -display $display
-Update-ServiceWorker -path "service-worker.js" -display $display
-Update-PackageJson   -path "package.json"      -semver  $semver
-
-$lastTag = Get-LastTag
-$section = Build-ChangelogSection -sinceRef $lastTag -version $semver -date (Get-Date)
-Prepend-ToFile -path "CHANGELOG.md" -content $section
-
-if (-not $NoCommit) {
-  & git add index.html service-worker.js package.json CHANGELOG.md | Out-Null
-  & git commit -m "chore(release): v$semver"
-  if ($LASTEXITCODE -ne 0) { Write-Host "warn: git commit failed or nothing to commit." -ForegroundColor Yellow }
+  $existing = Get-Content $changelogPath -Raw
+  ($section + $existing) | Write-Text -path $changelogPath
+  Write-Host "ok: CHANGELOG.md updated (prepended section for $display)"
 }
 
-if (-not $NoTag) {
-  & git tag -a "v$semver" -m "Release v$semver"
-  if ($LASTEXITCODE -ne 0) { Write-Host "warn: git tag failed (tag may already exist)." -ForegroundColor Yellow }
-}
+# ---------------- main ----------------
+try {
+  Assert-Git
 
-Write-Host "Done. Next:" -ForegroundColor Green
-Write-Host "  git push --follow-tags" -ForegroundColor Green
-Write-Host "  (Optional) gh release create v$semver -t ""Exercise Timer v$semver"" --generate-notes" -ForegroundColor Green
+  $semver  = Normalize-SemVer $NewVersion     # e.g., "12.0.0"
+  $display = ($NewVersion.Trim().ToLower().StartsWith('v')) ? $NewVersion.Trim() : "v$NewVersion"
+
+  if (-not (Test-Path "package.json")) { throw "package.json not found in current directory." }
+
+  Update-PackageJson -path "package.json" -semver $semver
+  Update-IndexHtml -path "index.html" -display $display
+  Update-ServiceWorker -path "service-worker.js" -display $display
+  Update-Changelog -display $display -fallbackCount $HistoryFallbackCount
+
+  Write-Host ""
+  Write-Host "Next steps:"
+  Write-Host "  git add ."
+  Write-Host "  git commit -m \"chore(release): $display\""
+  Write-Host "  git tag $display"
+  Write-Host "  git push && git push --tags"
+  Write-Host ""
+  Write-Host "Then rebuild desktop:"
+  Write-Host "  npm run dist"
+}
+catch {
+  Write-Error $_
+  exit 1
+}
