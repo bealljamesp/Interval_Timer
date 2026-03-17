@@ -213,7 +213,7 @@ What to commit vs. ignore
 
 🚫 Ignore (already in .gitignore): node_modules/, dist/, win-unpacked/, logs, OS junk.
 
-Bump commands - 
+Bump commands -
 	powershell -ExecutionPolicy Bypass -File .\bump-version.ps1 -NewVersion v11
 	or
 	Set-ExecutionPolicy -Scope Process Bypass
@@ -251,3 +251,5 @@ git push --follow-tags
 
 
 👉 All 3 commits will be grouped into the v12 section in your CHANGELOG.md.
+
+test
